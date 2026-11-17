@@ -6,7 +6,7 @@ if(!API_KEY){
 }
 
 // ===== 2. STABLE DIRECT MODEL =====
-const CHAT_MODEL = "gemini-1.5-flash-latest";
+const CHAT_MODEL = "gemini-1.5-flash";
 const chat = document.getElementById('chat');
 const input = document.getElementById('msg');
 const micBtn = document.getElementById('mic-btn');
@@ -115,4 +115,4 @@ function add(t, w){
   d.innerText = t;
   chat.appendChild(d);
   chat.scrollTop = chat.scrollHeight;
-}
+    }
