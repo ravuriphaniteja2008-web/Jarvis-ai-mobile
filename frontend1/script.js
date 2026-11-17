@@ -1,12 +1,12 @@
-// ===== 1. API KEY (Safe: browser storage) =====
+// ===== 1. API KEY (Safe: Browser Local Storage) =====
 let API_KEY = localStorage.getItem('jarvis_key');
 if(!API_KEY){
   API_KEY = prompt('Enter your Gemini API Key:');
   if(API_KEY) localStorage.setItem('jarvis_key', API_KEY);
 }
 
-// ===== 2. SMART MODELS (failover & auto-retry) =====
-const MODELS = ["gemini-2.5-flash", "gemini-flash-latest"];
+// ===== 2. STABLE MODELS (High-availability fallback list) =====
+const MODELS = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-flash-latest"];
 const chat = document.getElementById('chat');
 const input = document.getElementById('msg');
 const micBtn = document.getElementById('mic-btn');
@@ -45,7 +45,7 @@ async function askGemini(p){
   try{
     const reply = await callGemini(p);
     chat.lastChild.innerText = 'J.A.R.V.I.S: ' + reply;
-    speak(reply); // Reply with voice
+    speak(reply);
   }catch(e){
     chat.lastChild.innerText = 'J.A.R.V.I.S: ERROR - ' + e.message;
   }
@@ -53,33 +53,48 @@ async function askGemini(p){
 
 // ===== 4. SPEECH RECOGNITION (STT) =====
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-const rec = new SR(); 
-rec.lang = 'en-US'; // Change to 'te-IN' if you want Telugu voice input
+if(SR) {
+  const rec = new SR(); 
+  rec.lang = 'en-US'; 
 
-rec.onresult = (e) => {
-  const t = e.results[0][0].transcript;
-  add('YOU: ' + t, 'user');
-  askGemini(t);
-};
+  rec.onresult = (e) => {
+    const t = e.results[0][0].transcript;
+    add('YOU: ' + t, 'user');
+    askGemini(t);
+  };
 
-micBtn.onclick = () => {
-  rec.start();
-  micBtn.innerText = '🔴';
-};
+  micBtn.onclick = () => {
+    try {
+      rec.start();
+      micBtn.innerText = '🔴';
+    } catch(err) {
+      console.log(err);
+    }
+  };
 
-rec.onend = () => {
-  micBtn.innerText = '🎙️';
-};
+  rec.onend = () => {
+    micBtn.innerText = '🎙️';
+  };
+} else {
+  micBtn.onclick = () => {
+    alert("Speech recognition is not supported in this browser. Please use Chrome.");
+  };
+}
 
 // ===== 5. TEXT-TO-SPEECH (TTS) =====
 let voices = [];
 function loadVoices(){ 
-  voices = speechSynthesis.getVoices(); 
+  if('speechSynthesis' in window) {
+    voices = speechSynthesis.getVoices(); 
+  }
 }
 loadVoices();
-speechSynthesis.onvoiceschanged = loadVoices;
+if('speechSynthesis' in window) {
+  speechSynthesis.onvoiceschanged = loadVoices;
+}
 
 function speak(t){
+  if(!('speechSynthesis' in window)) return;
   const u = new SpeechSynthesisUtterance(t);
   u.rate = 1.05;
   u.pitch = 0.85;
@@ -97,7 +112,6 @@ document.getElementById('send').onclick = () => {
   askGemini(t);
 };
 
-// Allow pressing 'Enter' key to send message
 input.addEventListener('keypress', (e) => {
   if (e.key === 'Enter') {
     document.getElementById('send').click();
