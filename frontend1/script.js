@@ -3,15 +3,15 @@
 // ===== 1. API KEY & WORKING MODELS =====
 let API_KEY = localStorage.getItem('jarvis_key');
 if (!API_KEY) {
-  API_KEY = prompt('Enter your Gemini API Key:');
+  API_KEY = prompt('Enter your Gemini API Key (starts with AIzaSy...):');
   if (API_KEY) {
     localStorage.setItem('jarvis_key', API_KEY.trim());
   }
 }
 
 const MODELS = [
-  "gemini-2.5-flash-lite",
   "gemini-2.5-flash",
+  "gemini-2.5-flash-lite",
   "gemini-flash-latest"
 ];
 
@@ -58,7 +58,7 @@ async function callGemini(p) {
       
       if (data.error) {
         lastErr = new Error(data.error.message);
-        if (/high demand|temporar|quota|rate|unavailable|deprecated|not found|404/i.test(data.error.message)) {
+        if (/high demand|temporar|quota|rate|unavailable|deprecated|not found|404|resource exhausted|api_key/i.test(data.error.message)) {
           continue;
         }
         throw lastErr;
@@ -105,7 +105,7 @@ if (camBtn && imgInput) {
       const q = input.value.trim() || 'What do you see? Describe briefly.';
       add('YOU: ' + q, 'user');
       input.value = '';
-      imgInput.value = ''; // Reset file input so selecting the same image triggers onchange again
+      imgInput.value = ''; 
       askVision(base64, file.type, q);
     };
     reader.readAsDataURL(file);
@@ -137,7 +137,7 @@ async function askVision(base64, mime, q) {
 
       if (data.error) {
         lastErr = new Error(data.error.message);
-        if (/high demand|temporar|quota|rate|unavailable|deprecated|not found|404/i.test(data.error.message)) {
+        if (/high demand|temporar|quota|rate|unavailable|deprecated|not found|404|resource exhausted|api_key/i.test(data.error.message)) {
           continue;
         }
         throw lastErr;
@@ -192,7 +192,7 @@ loadVoices();
 speechSynthesis.onvoiceschanged = loadVoices;
 
 function speak(t) {
-  speechSynthesis.cancel(); // Stop any currently playing audio before starting new speech
+  speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(t);
   u.rate = 1.05;
   u.pitch = 0.85;
@@ -238,4 +238,4 @@ function add(t, w) {
   d.innerText = t;
   chat.appendChild(d);
   chat.scrollTop = chat.scrollHeight;
-      }
+}
