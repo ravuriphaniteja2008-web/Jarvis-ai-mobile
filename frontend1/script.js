@@ -2,7 +2,7 @@
 let API_KEY = localStorage.getItem('jarvis_key');
 if (!API_KEY) {
   API_KEY = prompt('Enter your Gemini API Key:');
-  if (API_KEY) localStorage.setItem('jarvis_key', API_KEY);
+  if (API_KEY) localStorage.setItem('jarvis_key', API_KEY.trim());
 }
 
 const MODELS = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"];
@@ -34,19 +34,22 @@ async function callGemini(p) {
   let lastErr;
   for (const m of MODELS) {
     try {
-      const url = "https://googleapis.com" + m + ":generateContent?key=" + API_KEY;
+      const url = "https://generativelanguage.googleapis.com/v1beta/models/" + m + ":generateContent";
       const res = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": API_KEY
+        },
         body: JSON.stringify({ contents: contents })
       });
       const data = await res.json();
       if (data.error) {
         lastErr = new Error(data.error.message);
-        if (/high demand|temporar|quota|rate|unavailable|deprecated/i.test(data.error.message)) continue;
+        if (/high demand|temporar|quota|rate|unavailable|deprecated|not found/i.test(data.error.message)) continue;
         throw lastErr;
       }
-      return data.candidates[0].content.parts[0].text;
+      return data.candidates.content.parts.text;
     } catch (e) {
       lastErr = e;
     }
@@ -72,11 +75,11 @@ async function askGemini(p) {
 if (camBtn && imgInput) {
   camBtn.onclick = () => imgInput.click();
   imgInput.onchange = () => {
-    const file = imgInput.files[0];
+    const file = imgInput.files;
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      const base64 = reader.result.split(',')[1];
+      const base64 = reader.result.split(',');
       const q = input.value.trim() || 'What do you see? Describe briefly.';
       add('YOU: ' + q, 'user');
       input.value = '';
@@ -91,10 +94,13 @@ async function askVision(base64, mime, q) {
   let lastErr;
   for (const m of MODELS) {
     try {
-      const url = "https://googleapis.com" + m + ":generateContent?key=" + API_KEY;
+      const url = "https://generativelanguage.googleapis.com/v1beta/models/" + m + ":generateContent";
       const res = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": API_KEY
+        },
         body: JSON.stringify({
           contents: [{
             parts: [
@@ -107,10 +113,10 @@ async function askVision(base64, mime, q) {
       const data = await res.json();
       if (data.error) {
         lastErr = new Error(data.error.message);
-        if (/high demand|temporar|quota|rate|unavailable|deprecated/i.test(data.error.message)) continue;
+        if (/high demand|temporar|quota|rate|unavailable|deprecated|not found/i.test(data.error.message)) continue;
         throw lastErr;
       }
-      const reply = data.candidates[0].content.parts[0].text;
+      const reply = data.candidates.content.parts.text;
       chat.lastChild.innerText = 'J.A.R.V.I.S: ' + reply;
       speak(reply);
       return;
@@ -127,7 +133,7 @@ if (SR && micBtn) {
   const rec = new SR();
   rec.lang = 'en-US';
   rec.onresult = (e) => {
-    const t = e.results[0][0].transcript;
+    const t = e.results.transcript;
     add('YOU: ' + t, 'user');
     askGemini(t);
   };
