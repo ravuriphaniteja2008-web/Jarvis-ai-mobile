@@ -5,7 +5,7 @@ if (!API_KEY) {
   if (API_KEY) localStorage.setItem('jarvis_key', API_KEY.trim());
 }
 
-const MODELS = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"];
+const MODELS = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite"];
 
 // ===== 2. MEMORY SYSTEM =====
 let MEMORY = JSON.parse(localStorage.getItem('jarvis_memory') || '[]');
@@ -23,6 +23,20 @@ const imgInput = document.getElementById('img-input');
 
 MEMORY.forEach(m => add((m.role === 'user' ? 'YOU: ' : 'J.A.R.V.I.S: ') + m.text, m.role === 'user' ? 'user' : 'ai'));
 
+// Helper for 10-second timeout so it never gets stuck
+async function fetchWithTimeout(url, options, timeout = 10000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(id);
+    return response;
+  } catch (err) {
+    clearTimeout(id);
+    throw err;
+  }
+}
+
 // ===== 3. GEMINI BRAIN (MEMORY INTEGRATED) =====
 async function callGemini(p) {
   const contents = MEMORY.slice(-12).map(m => ({
@@ -34,8 +48,8 @@ async function callGemini(p) {
   let lastErr;
   for (const m of MODELS) {
     try {
-      const url = "https://generativelanguage.googleapis.com/v1beta/models/" + m + ":generateContent";
-      const res = await fetch(url, {
+      const url = "https://googleapis.com" + m + ":generateContent";
+      const res = await fetchWithTimeout(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -49,9 +63,12 @@ async function callGemini(p) {
         if (/high demand|temporar|quota|rate|unavailable|deprecated|not found/i.test(data.error.message)) continue;
         throw lastErr;
       }
-      return data.candidates.content.parts.text;
+      if (!data.candidates || !data.candidates[0]) {
+        throw new Error("No response received from AI.");
+      }
+      return data.candidates[0].content.parts[0].text;
     } catch (e) {
-      lastErr = e;
+      lastErr = e.name === 'AbortError' ? new Error('Request timed out. Retrying...') : e;
     }
   }
   throw lastErr;
@@ -75,11 +92,11 @@ async function askGemini(p) {
 if (camBtn && imgInput) {
   camBtn.onclick = () => imgInput.click();
   imgInput.onchange = () => {
-    const file = imgInput.files;
+    const file = imgInput.files[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      const base64 = reader.result.split(',');
+      const base64 = reader.result.split(',')[1];
       const q = input.value.trim() || 'What do you see? Describe briefly.';
       add('YOU: ' + q, 'user');
       input.value = '';
@@ -94,8 +111,8 @@ async function askVision(base64, mime, q) {
   let lastErr;
   for (const m of MODELS) {
     try {
-      const url = "https://generativelanguage.googleapis.com/v1beta/models/" + m + ":generateContent";
-      const res = await fetch(url, {
+      const url = "https://googleapis.com" + m + ":generateContent";
+      const res = await fetchWithTimeout(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -109,19 +126,22 @@ async function askVision(base64, mime, q) {
             ]
           }]
         })
-      });
+      }, 15000);
       const data = await res.json();
       if (data.error) {
         lastErr = new Error(data.error.message);
         if (/high demand|temporar|quota|rate|unavailable|deprecated|not found/i.test(data.error.message)) continue;
         throw lastErr;
       }
-      const reply = data.candidates.content.parts.text;
+      if (!data.candidates || !data.candidates[0]) {
+        throw new Error("No image analysis received.");
+      }
+      const reply = data.candidates[0].content.parts[0].text;
       chat.lastChild.innerText = 'J.A.R.V.I.S: ' + reply;
       speak(reply);
       return;
     } catch (e) {
-      lastErr = e;
+      lastErr = e.name === 'AbortError' ? new Error('Image analysis timed out.') : e;
     }
   }
   chat.lastChild.innerText = 'J.A.R.V.I.S: ERROR - ' + lastErr.message;
@@ -133,7 +153,7 @@ if (SR && micBtn) {
   const rec = new SR();
   rec.lang = 'en-US';
   rec.onresult = (e) => {
-    const t = e.results.transcript;
+    const t = e.results[0][0].transcript;
     add('YOU: ' + t, 'user');
     askGemini(t);
   };
