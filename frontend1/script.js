@@ -113,4 +113,3 @@ function add(t, w){
   chat.scrollTop = chat.scrollHeight;
 }
 
-      
