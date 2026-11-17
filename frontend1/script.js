@@ -34,7 +34,8 @@ async function callGemini(p) {
   let lastErr;
   for (const m of MODELS) {
     try {
-      const res = await fetch(`https://googleapis.com{m}:generateContent?key=${API_KEY}`, {
+      const url = "https://googleapis.com" + m + ":generateContent?key=" + API_KEY;
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contents: contents })
@@ -90,7 +91,8 @@ async function askVision(base64, mime, q) {
   let lastErr;
   for (const m of MODELS) {
     try {
-      const res = await fetch(`https://googleapis.com{m}:generateContent?key=${API_KEY}`, {
+      const url = "https://googleapis.com" + m + ":generateContent?key=" + API_KEY;
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
