@@ -35,10 +35,10 @@ async function askGemini(p){
   add('J.A.R.V.I.S: Thinking...', 'ai');
   try{
     const reply = await callGemini(p);
-    chat.lastChild.innerText = 'J.A.R.V.I.S: ' + reply;
+    chat.lastChild.innerText = 'J.A.R.V.I.S: '+ reply;
     speak(reply);
   }catch(e){
-    chat.lastChild.innerText = 'J.A.R.V.I.S: ERROR - ' + e.message;
+    chat.lastChild.innerText = 'J.A.R.V.I.S: ERROR - '+ e.message;
   }
 }
 
@@ -50,7 +50,7 @@ if(SR) {
 
   rec.onresult = (e) => {
     const t = e.results[0][0].transcript;
-    add('YOU: ' + t, 'user');
+    add('YOU: '+ t, 'user');
     askGemini(t);
   };
 
@@ -98,7 +98,7 @@ function speak(t){
 document.getElementById('send').onclick = () => {
   const t = input.value.trim();
   if(!t) return;
-  add('YOU: ' + t, 'user');
+  add('YOU: '+ t, 'user');
   input.value = "";
   askGemini(t);
 };
@@ -111,7 +111,7 @@ input.addEventListener('keypress', (e) => {
 
 function add(t, w){
   const d = document.createElement('div');
-  d.className = 'msg ' + w;
+  d.className = 'msg '+ w;
   d.innerText = t;
   chat.appendChild(d);
   chat.scrollTop = chat.scrollHeight;
