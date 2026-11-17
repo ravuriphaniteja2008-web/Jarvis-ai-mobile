@@ -5,39 +5,30 @@ if(!API_KEY){
   if(API_KEY) localStorage.setItem('jarvis_key', API_KEY);
 }
 
-// ===== 2. STABLE MODELS (High-availability fallback list) =====
-const MODELS = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-flash-latest"];
+// ===== 2. STABLE DIRECT MODEL =====
+const CHAT_MODEL = "gemini-1.5-flash-latest";
 const chat = document.getElementById('chat');
 const input = document.getElementById('msg');
 const micBtn = document.getElementById('mic-btn');
 
-// ===== 3. GEMINI BRAIN (auto-fallback) =====
+// ===== 3. GEMINI BRAIN =====
 async function callGemini(p){
-  let lastErr;
-  for(const m of MODELS){
-    try{
-      const res = await fetch(
-        "https://generativelanguage.googleapis.com/v1beta/models/"+m+":generateContent?key="+API_KEY,
-        {
-          method: "POST", 
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({contents:[{parts:[{text:p}]}]})
-        }
-      );
-      const data = await res.json();
-      if(data.error){
-        lastErr = new Error(data.error.message);
-        if(/high demand|temporar|quota|rate|unavailable|no longer available|deprecated/i.test(data.error.message)) continue;
-        throw lastErr;
-      }
-      if(data.candidates && data.candidates[0].content){
-        return data.candidates[0].content.parts[0].text;
-      }
-    }catch(e){ 
-      lastErr = e; 
+  const res = await fetch(
+    "https://generativelanguage.googleapis.com/v1beta/models/" + CHAT_MODEL + ":generateContent?key=" + API_KEY,
+    {
+      method: "POST", 
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({contents:[{parts:[{text:p}]}]})
     }
+  );
+  const data = await res.json();
+  if(data.error){
+    throw new Error(data.error.message);
   }
-  throw lastErr;
+  if(data.candidates && data.candidates[0].content){
+    return data.candidates[0].content.parts[0].text;
+  }
+  throw new Error("No response generated.");
 }
 
 async function askGemini(p){
