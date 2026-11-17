@@ -6,13 +6,13 @@ if (!API_KEY) {
 }
 
 const MODELS = [
-  "gemini-3-flash-preview",
   "gemini-2.5-flash-lite",
+  "gemini-3-flash-preview",
   "gemini-3.1-flash-lite-preview",
-  "gemini-3.5-flash-lite"
+  "gemini-2.5-flash"
 ];
 
-const SYSTEM_PROMPT = "You are J.A.R.V.I.S., Tony Stark's witty AI assistant. Address the user as Sir. Keep answers concise and helpful.\n\n";
+const SYSTEM_PROMPT = "You are J.A.R.V.I.S., Tony Stark's witty AI assistant. Address the user as Sir. Keep answers concise.\n\n";
 
 // ===== 2. MEMORY SYSTEM =====
 let MEMORY = JSON.parse(localStorage.getItem('jarvis_memory') || '[]');
@@ -30,7 +30,7 @@ const imgInput = document.getElementById('img-input');
 
 MEMORY.forEach(m => add((m.role === 'user' ? 'YOU: ' : 'J.A.R.V.I.S: ') + m.text, m.role === 'user' ? 'user' : 'ai'));
 
-// ===== 3. GEMINI BRAIN (MEMORY + FAST HEADERS) =====
+// ===== 3. GEMINI BRAIN =====
 async function callGemini(p) {
   const contents = MEMORY.slice(-12).map(m => ({
     role: m.role,
@@ -39,25 +39,24 @@ async function callGemini(p) {
   contents.push({ role: 'user', parts: [{ text: SYSTEM_PROMPT + "User: " + p }] });
 
   let lastErr;
-  for (const model of MODELS) {
+  for (let i = 0; i < MODELS.length; i++) {
+    const model = MODELS[i];
     try {
       const res = await fetch(
-        `https://googleapis.com{model}:generateContent?key=${API_KEY.trim()}`,
+        "https://googleapis.com" + model + ":generateContent?key=" + API_KEY.trim(),
         {
           method: "POST",
-          headers: {
-            "Content-Type": "text/plain;charset=UTF-8"
-          },
+          headers: { "Content-Type": "text/plain;charset=UTF-8" },
           body: JSON.stringify({ contents: contents })
         }
       );
 
       const data = await res.json();
 
-      if (res.ok && data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+      if (res.ok && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts[0]) {
         return data.candidates[0].content.parts[0].text;
       } else {
-        lastErr = new Error(data.error?.message || "Model busy, trying next...");
+        lastErr = new Error(data.error ? data.error.message : "Model busy, trying next...");
       }
     } catch (e) {
       lastErr = e;
@@ -80,7 +79,7 @@ async function askGemini(p) {
   }
 }
 
-// ===== 4. VISION ENGINE (EYES) =====
+// ===== 4. VISION ENGINE =====
 if (camBtn && imgInput) {
   camBtn.onclick = () => imgInput.click();
   imgInput.onchange = () => {
@@ -101,15 +100,14 @@ if (camBtn && imgInput) {
 async function askVision(base64, mime, q) {
   add('J.A.R.V.I.S: Analyzing image...', 'ai');
   let lastErr;
-  for (const model of MODELS) {
+  for (let i = 0; i < MODELS.length; i++) {
+    const model = MODELS[i];
     try {
       const res = await fetch(
-        `https://googleapis.com{model}:generateContent?key=${API_KEY.trim()}`,
+        "https://googleapis.com" + model + ":generateContent?key=" + API_KEY.trim(),
         {
           method: "POST",
-          headers: {
-            "Content-Type": "text/plain;charset=UTF-8"
-          },
+          headers: { "Content-Type": "text/plain;charset=UTF-8" },
           body: JSON.stringify({
             contents: [{
               parts: [
@@ -123,13 +121,13 @@ async function askVision(base64, mime, q) {
 
       const data = await res.json();
 
-      if (res.ok && data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+      if (res.ok && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts[0]) {
         const reply = data.candidates[0].content.parts[0].text;
         chat.lastChild.innerText = 'J.A.R.V.I.S: ' + reply;
         speak(reply);
         return;
       } else {
-        lastErr = new Error(data.error?.message || "Model busy, trying next...");
+        lastErr = new Error(data.error ? data.error.message : "Model busy, trying next...");
       }
     } catch (e) {
       lastErr = e;
@@ -202,4 +200,4 @@ function add(t, w) {
   d.innerText = t;
   chat.appendChild(d);
   chat.scrollTop = chat.scrollHeight;
-                        }
+                               }
