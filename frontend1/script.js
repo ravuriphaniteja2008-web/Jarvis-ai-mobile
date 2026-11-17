@@ -1,11 +1,18 @@
-// ===== 1. API KEY & SMART MODELS =====
+// ===== 1. API KEY & WORKING MODELS =====
 let API_KEY = localStorage.getItem('jarvis_key');
 if (!API_KEY) {
   API_KEY = prompt('Enter your Gemini API Key:');
   if (API_KEY) localStorage.setItem('jarvis_key', API_KEY.trim());
 }
 
-const MODELS = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite"];
+const MODELS = [
+  "gemini-3-flash-preview",
+  "gemini-2.5-flash-lite",
+  "gemini-3.1-flash-lite-preview",
+  "gemini-3.5-flash-lite"
+];
+
+const SYSTEM_PROMPT = "You are J.A.R.V.I.S., Tony Stark's witty AI assistant. Address the user as Sir. Keep answers concise and helpful.\n\n";
 
 // ===== 2. MEMORY SYSTEM =====
 let MEMORY = JSON.parse(localStorage.getItem('jarvis_memory') || '[]');
@@ -23,52 +30,37 @@ const imgInput = document.getElementById('img-input');
 
 MEMORY.forEach(m => add((m.role === 'user' ? 'YOU: ' : 'J.A.R.V.I.S: ') + m.text, m.role === 'user' ? 'user' : 'ai'));
 
-// Helper for 10-second timeout so it never gets stuck
-async function fetchWithTimeout(url, options, timeout = 10000) {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeout);
-  try {
-    const response = await fetch(url, { ...options, signal: controller.signal });
-    clearTimeout(id);
-    return response;
-  } catch (err) {
-    clearTimeout(id);
-    throw err;
-  }
-}
-
-// ===== 3. GEMINI BRAIN (MEMORY INTEGRATED) =====
+// ===== 3. GEMINI BRAIN (MEMORY + FAST HEADERS) =====
 async function callGemini(p) {
   const contents = MEMORY.slice(-12).map(m => ({
     role: m.role,
     parts: [{ text: m.text }]
   }));
-  contents.push({ role: 'user', parts: [{ text: p }] });
+  contents.push({ role: 'user', parts: [{ text: SYSTEM_PROMPT + "User: " + p }] });
 
   let lastErr;
-  for (const m of MODELS) {
+  for (const model of MODELS) {
     try {
-      const url = "https://googleapis.com" + m + ":generateContent";
-      const res = await fetchWithTimeout(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": API_KEY
-        },
-        body: JSON.stringify({ contents: contents })
-      });
+      const res = await fetch(
+        `https://googleapis.com{model}:generateContent?key=${API_KEY.trim()}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "text/plain;charset=UTF-8"
+          },
+          body: JSON.stringify({ contents: contents })
+        }
+      );
+
       const data = await res.json();
-      if (data.error) {
-        lastErr = new Error(data.error.message);
-        if (/high demand|temporar|quota|rate|unavailable|deprecated|not found/i.test(data.error.message)) continue;
-        throw lastErr;
+
+      if (res.ok && data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+        return data.candidates[0].content.parts[0].text;
+      } else {
+        lastErr = new Error(data.error?.message || "Model busy, trying next...");
       }
-      if (!data.candidates || !data.candidates[0]) {
-        throw new Error("No response received from AI.");
-      }
-      return data.candidates[0].content.parts[0].text;
     } catch (e) {
-      lastErr = e.name === 'AbortError' ? new Error('Request timed out. Retrying...') : e;
+      lastErr = e;
     }
   }
   throw lastErr;
@@ -109,39 +101,38 @@ if (camBtn && imgInput) {
 async function askVision(base64, mime, q) {
   add('J.A.R.V.I.S: Analyzing image...', 'ai');
   let lastErr;
-  for (const m of MODELS) {
+  for (const model of MODELS) {
     try {
-      const url = "https://googleapis.com" + m + ":generateContent";
-      const res = await fetchWithTimeout(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": API_KEY
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: q },
-              { inline_data: { mime_type: mime, data: base64 } }
-            ]
-          }]
-        })
-      }, 15000);
+      const res = await fetch(
+        `https://googleapis.com{model}:generateContent?key=${API_KEY.trim()}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "text/plain;charset=UTF-8"
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: SYSTEM_PROMPT + q },
+                { inline_data: { mime_type: mime, data: base64 } }
+              ]
+            }]
+          })
+        }
+      );
+
       const data = await res.json();
-      if (data.error) {
-        lastErr = new Error(data.error.message);
-        if (/high demand|temporar|quota|rate|unavailable|deprecated|not found/i.test(data.error.message)) continue;
-        throw lastErr;
+
+      if (res.ok && data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+        const reply = data.candidates[0].content.parts[0].text;
+        chat.lastChild.innerText = 'J.A.R.V.I.S: ' + reply;
+        speak(reply);
+        return;
+      } else {
+        lastErr = new Error(data.error?.message || "Model busy, trying next...");
       }
-      if (!data.candidates || !data.candidates[0]) {
-        throw new Error("No image analysis received.");
-      }
-      const reply = data.candidates[0].content.parts[0].text;
-      chat.lastChild.innerText = 'J.A.R.V.I.S: ' + reply;
-      speak(reply);
-      return;
     } catch (e) {
-      lastErr = e.name === 'AbortError' ? new Error('Image analysis timed out.') : e;
+      lastErr = e;
     }
   }
   chat.lastChild.innerText = 'J.A.R.V.I.S: ERROR - ' + lastErr.message;
@@ -211,4 +202,4 @@ function add(t, w) {
   d.innerText = t;
   chat.appendChild(d);
   chat.scrollTop = chat.scrollHeight;
-}
+                        }
