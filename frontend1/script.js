@@ -5,7 +5,7 @@ if(!API_KEY){
   if(API_KEY) localStorage.setItem('jarvis_key', API_KEY);
 }
 
-// ===== 2. STABLE DIRECT MODEL =====
+// ===== 2. STABLE WORKING MODEL =====
 const CHAT_MODEL = "gemini-1.5-flash";
 const chat = document.getElementById('chat');
 const input = document.getElementById('msg');
@@ -115,4 +115,4 @@ function add(t, w){
   d.innerText = t;
   chat.appendChild(d);
   chat.scrollTop = chat.scrollHeight;
-    }
+}
